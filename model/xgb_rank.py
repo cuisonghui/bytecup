@@ -67,7 +67,7 @@ def main():
         'seed': 519,
         'scale_pos_weight': len(train_y[train_y==0]) / len(train_y[train_y==1]),
         'early_stopping_rounds': 100,
-        'eval_metric': 'ndcg'
+#        'eval_metric': 'ndcg'
     }
 
     watchlist = [(dtrain, 'train'), (dval, 'val')]
@@ -77,7 +77,7 @@ def main():
     valid = pd.read_csv(VALID)
     valid = valid[['qid', 'uid']]
     pred = pd.concat([valid, pd.DataFrame(ypred, columns=['label'])], axis=1)
-    pred.to_csv('output/xgb.csv', index=False)
+    pred.to_csv('output/xgb_rank.csv', index=False)
 
 if __name__ == '__main__':
     main()
