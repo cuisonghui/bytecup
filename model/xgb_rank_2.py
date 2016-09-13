@@ -11,8 +11,8 @@ from sklearn.cross_validation import train_test_split
 from config import *
 from config.filepath_original import *
 
-def main():
-    folder = sys.argv[1] if len(sys.argv) == 2 else DIR
+def get_question_user():
+    folder = sys.argv[1] if len(sys.argv) == 2 else 'datasets'
 
     question = pd.read_csv(os.path.join(folder, 'question_info.txt'), delimiter='\t', header=None)
     question.columns = ('qid', 'qlabel', 'wordseq', 'charseq', 'likenum', 'ansnum', 'bansnum')
@@ -38,45 +38,49 @@ def main():
     question = pd.concat([question[['qid', 'likenum', 'ansnum', 'bansnum']], qlabel], axis=1)
     user = pd.concat([user[['uid']], ulabel], axis=1)
 
-    train = pd.read_csv(TRAIN, delimiter='\t', header=None)
-    train.columns = ('qid', 'uid', 'label')
-    train_x = train[['qid', 'uid']]
-    train_y = train['label']
-    train_x = pd.merge(train_x, question, on='qid', how='left')
-    train_x = pd.merge(train_x, user, on='uid', how='left')
-    train_x = train_x.drop(['qid', 'uid'], axis=1)
-    train_x = train_x.values
-    train_y = train_y.values
+    return question, user
 
-    valid = pd.read_csv(VALID)
-    valid = valid.drop('label', axis=1)
-    valid = pd.merge(valid, question, on='qid', how='left')
-    valid = pd.merge(valid, user, on='uid', how='left')
-    valid = valid.drop(['qid', 'uid'], axis=1)
+def get_DataFrame(question, user, input_dataset, input_group, label=True):
+    df = pd.read_csv(input_dataset)
+    df_x = df[['qid', 'uid']]
+    df_y = df['label']
+    df_x = pd.merge(df_x, question, on='qid', how='left')
+    df_x = pd.merge(df_x, user, on='uid', how='left')
+    df_x = df_x.drop(['qid', 'uid'], axis=1)
+    df_x = df_x.values
+    df_y = df_y.values
 
-    train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, test_size=0.2, random_state=519)
+    d = xgb.DMatrix(df_x, df_y) if label else xgb.DMatrix(df_x)
+    d.set_group(np.loadtxt(input_group).astype(int))
+    return d
 
-    print(train_x.shape)
-    print(train_y.shape)
-    dtrain = xgb.DMatrix(train_x, train_y)
-    dval = xgb.DMatrix(val_x, val_y)
-    dtest = xgb.DMatrix(valid)
+def train_model(dtrain, dval, dtest):
     params = {
         'booster': 'gbtree',
-        'objective': 'binary:logistic',
+        'objective': 'rank:pairwise',
         'seed': 519,
-        'scale_pos_weight': len(train_y[train_y==0]) / len(train_y[train_y==1]),
-        'early_stopping_rounds': 100
+        'scale_pos_weight': 162326.0 / 21986.0,
+        'early_stopping_rounds': 100,
+        'eval_metric': 'ndcg'
     }
 
     watchlist = [(dtrain, 'train'), (dval, 'val')]
     bst = xgb.train(params, dtrain, num_boost_round=2000, evals=watchlist)
+
+def main():
+    question, user = get_question_user()
+
+    dtrain = get_DataFrame(question, user, os.path.join(DIR, 'train.csv'), os.path.join(DIR, 'train.group'))
+    dval = get_DataFrame(question, user, os.path.join(DIR, 'val.csv'), os.path.join(DIR, 'val.group'))
+    dtest = get_DataFrame(question, user, VALID, os.path.join(DIR, 'test.group'), label=False)
+
+    bst = train_model(dtrain, dval, dtest)
     ypred = bst.predict(dtest, ntree_limit=bst.best_ntree_limit)
 
     valid = pd.read_csv(VALID)
     valid = valid[['qid', 'uid']]
     pred = pd.concat([valid, pd.DataFrame(ypred, columns=['label'])], axis=1)
-    pred.to_csv('output/xgb.csv', index=False)
+    pred.to_csv('output/xgb_rank_2.csv', index=False)
 
 if __name__ == '__main__':
     main()

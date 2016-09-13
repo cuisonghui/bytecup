@@ -7,5 +7,5 @@ DIR = 'datasets'
 USER = os.path.join(DIR, 'user_info.txt')
 QUESTION = os.path.join(DIR, 'question_info.txt')
 TRAIN = os.path.join(DIR, 'invited_info_train_uniq.txt')
-VALID = os.path.join(DIR, 'validate_nolabel.txt')
+VALID = os.path.join(DIR, 'validate_nolabel_sorted.txt')
 
