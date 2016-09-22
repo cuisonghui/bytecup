@@ -56,6 +56,10 @@ def get_DataFrame(question, user, input_dataset, input_group, label=True):
 
 def train_model(dtrain, dval, dtest):
     params = {
+        'max_depth': 10,
+        'eta': 0.02,
+        'alpha': 0,
+        'lambda': 400,
         'booster': 'gbtree',
         'objective': 'rank:pairwise',
         'seed': 519,
@@ -66,6 +70,7 @@ def train_model(dtrain, dval, dtest):
 
     watchlist = [(dtrain, 'train'), (dval, 'val')]
     bst = xgb.train(params, dtrain, num_boost_round=2000, evals=watchlist)
+    return bst
 
 def main():
     question, user = get_question_user()
