@@ -6,8 +6,10 @@ import sys
 import numpy as np
 import pandas as pd
 from keras.preprocessing import sequence
-from keras.models import Model
-from keras.layers import Dense, Dropout, Embedding, LSTM, Input
+from keras.models import Model, Sequential
+from keras.layers import Dense, Dropout, Embedding, LSTM, Lambda, Merge, BatchNormalization, Input
+from keras.callbacks import EarlyStopping
+from keras import backend as K
 
 from config import *
 from config.filepath_original import *
@@ -80,14 +82,31 @@ def train_model(train, test):
     test_x = test_x.drop(['qwordseq', 'uwordseq'], axis=1).values
     train_y = train_y.values
 
+    def lambda_output_shape(input_shape):
+        return (sum(shape[1] for shape in input_shape),)
+
     batch_size = 128
+
     input_feature = Input(shape=(train_x.shape[1],))
     input_qwordseq = Input(shape=(QWORDSEQ_MAXLEN,))
     input_uwordseq = Input(shape=(UWORDSEQ_MAXLEN,))
-    embedding_q = Embedding(QWORDSEQ_SIZE, 32, input_length=QWORDSEQ_MAXLEN, mask_zero=True)(input_qwordseq)
-    embedding_u = Embedding(UWORDSEQ_SIZE, 32, input_length=UWORDSEQ_MAXLEN, mask_zero=True)(input_uwordseq)
-    lstm_q = LSTM(32)(embedding_q)
-    lstm_u = LSTM(32)(embedding_u) 
+    embedding_q = Embedding(QWORDSEQ_SIZE, 64, input_length=QWORDSEQ_MAXLEN, mask_zero=True)(input_qwordseq)
+    embedding_u = Embedding(UWORDSEQ_SIZE, 64, input_length=UWORDSEQ_MAXLEN, mask_zero=True)(input_uwordseq)
+    lstm_q = LSTM(64)(embedding_q)
+    lstm_u = LSTM(64)(embedding_u) 
+#    x = Merge([input_feature, lstm_q, lstm_u], mode='concat', concat_axis=1)()
+    lambda_layer = Lambda(lambda x: K.concatenate(x, axis=1), output_shape=(input_feature.shape[1] + lstm_q.shape[1] + lstm_u.shape[1], ))
+    x = lambda_layer([input_feature, lstm_q, lstm_u])
+    x = BatchNormalization()(x)
+    output = Dense(128, activation='sigmod')(x)
+    model = Model(input=[input_feature, input_qwordseq, input_uwordseq], output=output)
+
+    model.compile(optimizer='sgd', loss='binary_crossentropy', metrics=['accuracy'])
+    model.fit([train_x, train_qwordseq, train_uwordseq], train_y,
+              batch_size=batch_size, nb_epoch=100, verbose=1,
+              callbacks=[],
+              validation_split=0.2,
+              shuffle=True)
 
 def main():
     question, user = get_question_user()
