@@ -81,9 +81,12 @@ def train_model(train, test):
     train_x = train_x.drop(['qwordseq', 'uwordseq'], axis=1).values
     test_x = test_x.drop(['qwordseq', 'uwordseq'], axis=1).values
     train_y = train_y.values
+    print('train_x:', train_x.shape)
+    print('train_y:', train_y.shape)
+    print('test_x:', test_x.shape)
 
     def lambda_output_shape(input_shape):
-        return (sum(shape[1] for shape in input_shape),)
+        return (None,) + (sum(shape[1] for shape in input_shape),)
 
     batch_size = 128
 
@@ -95,10 +98,10 @@ def train_model(train, test):
     lstm_q = LSTM(64)(embedding_q)
     lstm_u = LSTM(64)(embedding_u) 
 #    x = Merge([input_feature, lstm_q, lstm_u], mode='concat', concat_axis=1)()
-    lambda_layer = Lambda(lambda x: K.concatenate(x, axis=1), output_shape=(input_feature.shape[1] + lstm_q.shape[1] + lstm_u.shape[1], ))
+    lambda_layer = Lambda(lambda x: K.concatenate(x, axis=1), output_shape=lambda_output_shape)
     x = lambda_layer([input_feature, lstm_q, lstm_u])
     x = BatchNormalization()(x)
-    output = Dense(128, activation='sigmod')(x)
+    output = Dense(128, activation='sigmoid')(x)
     model = Model(input=[input_feature, input_qwordseq, input_uwordseq], output=output)
 
     model.compile(optimizer='sgd', loss='binary_crossentropy', metrics=['accuracy'])
