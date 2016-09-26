@@ -86,7 +86,7 @@ def train_model(train, test):
     print('test_x:', test_x.shape)
 
     def lambda_output_shape(input_shape):
-        return (None,) + (sum(shape[1] for shape in input_shape),)
+        return (None, sum(shape[1] for shape in input_shape))
 
     batch_size = 128
 
